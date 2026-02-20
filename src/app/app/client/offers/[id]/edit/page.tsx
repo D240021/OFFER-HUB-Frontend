@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { cn } from "@/lib/cn";
 import { useModeStore } from "@/stores/mode-store";
@@ -13,6 +13,8 @@ import {
   PRIMARY_BUTTON,
 } from "@/lib/styles";
 import { Icon, ICON_PATHS, LoadingSpinner } from "@/components/ui/Icon";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Toast } from "@/components/ui/Toast";
 import { FormField } from "@/components/ui/FormField";
 import { AttachmentPreview } from "@/components/offers/AttachmentPreview";
 import type { Attachment, FormErrors, OfferFormData } from "@/types/client-offer.types";
@@ -26,21 +28,67 @@ import {
   ALLOWED_IMAGE_TYPES,
   ALLOWED_DOC_TYPES,
   MOCK_API_DELAY,
+  MOCK_CLIENT_OFFER_DETAILS,
   validateOfferForm,
+  resolveCategoryValue,
 } from "@/data/client-offer.data";
 
-export default function CreateOfferPage(): React.JSX.Element {
+export default function EditOfferPage(): React.JSX.Element {
   const router = useRouter();
+  const params = useParams();
+  const offerId = params.id as string;
   const { setMode } = useModeStore();
   const [isLoading, setIsLoading] = useState(false);
+  const [isNotFound, setIsNotFound] = useState(false);
   const [errors, setErrors] = useState<FormErrors>({});
   const [formData, setFormData] = useState<OfferFormData>(INITIAL_FORM_DATA);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const [showToast, setShowToast] = useState(false);
+  const [originalDeadline, setOriginalDeadline] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setMode("client");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const offer = MOCK_CLIENT_OFFER_DETAILS[offerId];
+    if (!offer) {
+      setIsNotFound(true);
+      return;
+    }
+
+    setFormData({
+      title: offer.title,
+      description: offer.description,
+      budget: String(offer.budget),
+      category: resolveCategoryValue(offer.category),
+      deadline: offer.deadline,
+    });
+    setOriginalDeadline(offer.deadline);
+
+    if (offer.attachments && offer.attachments.length > 0) {
+      const preloaded: Attachment[] = offer.attachments.map((att, index) => ({
+        id: `existing-${index}-${Date.now()}`,
+        file: new File([], att.name, { type: att.type === "image" ? "image/png" : "application/pdf" }),
+        type: att.type,
+        preview: undefined,
+        displaySize: att.size,
+      }));
+      setAttachments(preloaded);
+    }
+  }, [offerId]);
+
+  useEffect(() => {
+    return () => {
+      attachments.forEach((attachment) => {
+        if (attachment.preview) {
+          URL.revokeObjectURL(attachment.preview);
+        }
+      });
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -109,10 +157,14 @@ export default function CreateOfferPage(): React.JSX.Element {
     }
   }
 
+  const handleToastClose = useCallback(() => {
+    setShowToast(false);
+  }, []);
+
   async function handleSubmit(e: React.FormEvent): Promise<void> {
     e.preventDefault();
 
-    const validationErrors = validateOfferForm(formData);
+    const validationErrors = validateOfferForm(formData, originalDeadline);
     setErrors(validationErrors);
 
     if (Object.keys(validationErrors).length > 0) {
@@ -122,22 +174,39 @@ export default function CreateOfferPage(): React.JSX.Element {
     setIsLoading(true);
     await new Promise((resolve) => setTimeout(resolve, MOCK_API_DELAY));
     setIsLoading(false);
+    setShowToast(true);
 
-    router.push("/app/client/dashboard");
+    setTimeout(() => {
+      router.push(`/app/client/offers/${offerId}`);
+    }, 1000);
+  }
+
+  if (isNotFound) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <EmptyState
+          icon={ICON_PATHS.briefcase}
+          message="Offer not found"
+          linkHref="/app/client/offers"
+          linkText="Back to offers"
+        />
+      </div>
+    );
   }
 
   const today = new Date().toISOString().split("T")[0];
   const canAddMoreFiles = attachments.length < MAX_ATTACHMENTS;
+  const detailHref = `/app/client/offers/${offerId}`;
 
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <Link href="/app/client/dashboard" className={ICON_BUTTON}>
+        <Link href={detailHref} className={ICON_BUTTON}>
           <Icon path={ICON_PATHS.chevronLeft} size="md" className="text-text-primary" />
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-text-primary">Create New Offer</h1>
-          <p className="text-text-secondary mt-1">Post a job opportunity for freelancers</p>
+          <h1 className="text-2xl font-bold text-text-primary">Edit Offer</h1>
+          <p className="text-text-secondary mt-1">Update your job offer details</p>
         </div>
       </div>
 
@@ -240,6 +309,7 @@ export default function CreateOfferPage(): React.JSX.Element {
                       key={attachment.id}
                       attachment={attachment}
                       onRemove={() => removeAttachment(attachment.id)}
+                      displaySize={attachment.displaySize}
                     />
                   ))}
                 </div>
@@ -297,14 +367,14 @@ export default function CreateOfferPage(): React.JSX.Element {
                   {isLoading ? (
                     <span className="flex items-center gap-2 justify-center">
                       <LoadingSpinner />
-                      Publishing...
+                      Saving...
                     </span>
                   ) : (
-                    "Publish Offer"
+                    "Save Changes"
                   )}
                 </button>
                 <Link
-                  href="/app/client/dashboard"
+                  href={detailHref}
                   className={cn(
                     "block w-full px-6 py-3 rounded-xl font-medium text-center",
                     "bg-background text-text-secondary",
@@ -320,6 +390,14 @@ export default function CreateOfferPage(): React.JSX.Element {
           </div>
         </div>
       </form>
+
+      {showToast && (
+        <Toast
+          message="Offer updated successfully!"
+          type="success"
+          onClose={handleToastClose}
+        />
+      )}
     </div>
   );
 }
