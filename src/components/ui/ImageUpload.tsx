@@ -14,7 +14,7 @@ export function ImageUpload({
   onUpload,
   onRemove,
   className,
-  aspectRatio = "square",
+  aspectRatio = "free",
   label,
   error: externalError,
 }: ImageUploadProps) {
