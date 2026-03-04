@@ -116,9 +116,10 @@ export function ServiceCard({ service, className }: ServiceCardProps): React.JSX
         </span>
         {service.totalOrders > 10 && (
           <span className={cn(
-            "px-3 py-1.5 rounded-xl text-xs font-semibold",
+            "flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold",
             "bg-success/10 text-success border border-success/20"
           )}>
+            <Icon path={ICON_PATHS.check} size="sm" className="text-success" />
             Top Rated
           </span>
         )}
