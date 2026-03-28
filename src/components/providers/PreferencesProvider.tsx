@@ -34,7 +34,7 @@ export function PreferencesProvider(): React.JSX.Element | null {
     const resolvedTheme = resolveTheme(preferences.theme);
 
     root.lang = preferences.language;
-    root.classList.toggle("dark", resolvedTheme === "dark");
+    root.classList.toggle("dark", false);
     root.dataset.theme = resolvedTheme;
     root.dataset.timezone = preferences.timezone;
     root.dataset.currency = preferences.currency;

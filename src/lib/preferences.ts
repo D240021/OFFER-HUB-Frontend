@@ -94,7 +94,7 @@ export const DEFAULT_PREFERENCES: UserPreferences = {
   language: "en-US",
   timezone: "UTC",
   currency: "USD",
-  theme: "system",
+  theme: "light",
   dateFormat: "DD/MM/YYYY",
   timeFormat: "24h",
 };
@@ -153,18 +153,14 @@ export function detectBrowserPreferences(): UserPreferences {
     language: browserLanguage,
     timezone,
     currency,
-    theme,
+    theme: "light",
     dateFormat,
     timeFormat,
   };
 }
 
 export function resolveTheme(theme: ThemePreference): "light" | "dark" {
-  if (theme !== "system") {
-    return theme;
-  }
-
-  if (typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches) {
+  if (theme === "dark") {
     return "dark";
   }
 
